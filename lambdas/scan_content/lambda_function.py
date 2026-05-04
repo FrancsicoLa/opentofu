@@ -1,21 +1,18 @@
 import json
-import base64
-
-EICAR_SIGNATURE = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
 def lambda_handler(event, context):
-    print(f"[SCAN] Escaneando file_id={event.get('file_id')}")
-    try:
-        contenido_bytes = base64.b64decode(event["content_base64"])
-    except Exception as e:
-        raise ValueError(f"content_base64 invalido: {e}")
+    print(f"[RISK ASSESS] Analizando transacción: {event.get('transaction_id')}")
     
-    if EICAR_SIGNATURE in contenido_bytes:
-        event["is_malicious"] = True
-        event["scan_reason"] = "EICAR signature detected"
+    amount = event.get("amount", 0)
+    country = event.get("country", "")
+    
+    # Compute risk_level
+    if amount > 10000 or country != "MX":
+        event["risk_level"] = "high"
+        event["scan_reason"] = "High amount or foreign transaction"
     else:
-        event["is_malicious"] = False
-        event["scan_reason"] = "clean"
-    
-    print(f"[SCAN] Resultado: is_malicious={event['is_malicious']}")
+        event["risk_level"] = "low"
+        event["scan_reason"] = "Standard transaction"
+        
+    print(f"[RISK ASSESS] Resultado: risk_level={event['risk_level']}")
     return event

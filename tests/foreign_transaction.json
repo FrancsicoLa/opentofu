@@ -1,0 +1,7 @@
+{
+  "transaction_id": "tx-foreign-303",
+  "account": "1234-5678",
+  "amount": 500.00,
+  "country": "US",
+  "merchant": "Online Store"
+}

@@ -1,0 +1,7 @@
+{
+  "transaction_id": "tx-normal-101",
+  "account": "1234-5678",
+  "amount": 1500.00,
+  "country": "MX",
+  "merchant": "Supermercado"
+}

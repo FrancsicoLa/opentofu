@@ -1,188 +1,96 @@
-# demo-tofu 🚀
+# Proyecto Final AWS Data Engineering: Banking Transaction Pipeline 🚀
 
-Proyecto de demostración de infraestructura como código usando **OpenTofu** (fork open-source de Terraform) para desplegar un pipeline serverless de procesamiento y cuarentena de archivos en AWS.
+Proyecto de infraestructura como código usando **OpenTofu** para automatizar el despliegue de un pipeline serverless en AWS. Este proyecto implementa una lógica de procesamiento de transacciones bancarias utilizando AWS Step Functions y AWS Lambda, integrando prácticas de CI/CD mediante GitHub Actions.
 
-> Desarrollado para el curso de **Big Data** — UAG.
-
----
-
-## 📐 Arquitectura
-
-El proyecto despliega un pipeline de tres pasos orquestado por funciones Lambda que valida, escanea y enruta archivos entrantes a un bucket S3:
-
-```
-Evento de entrada
-      │
-      ▼
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   validate  │────▶│     scan     │────▶│    route    │
-│  (Lambda 1) │     │  (Lambda 2)  │     │  (Lambda 3) │
-└─────────────┘     └──────────────┘     └─────────────┘
-  Valida campos       Detecta firma         Mueve archivo a:
-  obligatorios        EICAR (malware)       • clean/
-                                            • quarantine/
-                                                  │
-                                                  ▼
-                                          ┌──────────────┐
-                                          │  S3 Bucket   │
-                                          │  (quarantine)│
-                                          └──────────────┘
-```
+> Desarrollado para el curso de **AWS Academy Data Engineering** — Universidad Autónoma de Guadalajara.
 
 ---
 
-## 📁 Estructura del proyecto
+## 📐 Arquitectura del Pipeline
+
+El pipeline procesa transacciones bancarias en formato JSON, evaluando su nivel de riesgo y enrutándolas a diferentes prefijos dentro de un bucket de S3.
+
+El flujo es orquestado por **AWS Step Functions**:
+
+```mermaid
+graph TD
+    A[Inicio: Evento JSON] --> B[L1: ValidateTransaction]
+    B --> C[L2: AssessRisk]
+    C --> D{Choice: risk_level}
+    D -- "high" --> E[L3: RouteTransaction (review/)]
+    D -- "low" --> F[L3: RouteTransaction (approved/)]
+    E --> G[(S3 Bucket)]
+    F --> G
+```
+
+1. **ValidateTransaction (L1)**: Verifica que la transacción tenga un monto mayor a 0, un código de país ISO de 2 letras y un formato de cuenta válido.
+2. **AssessRisk (L2)**: Calcula el riesgo de la transacción. Se considera de alto riesgo (`risk_level: high`) si el monto supera los $10,000 o si el país de origen no es México ("MX").
+3. **RouteTransaction (L3)**: Guarda el registro JSON procesado en el bucket S3 bajo el prefijo `approved/` (si es bajo riesgo) o `review/` (si es alto riesgo).
+
+---
+
+## 📂 Estructura del Proyecto
 
 ```
-demo-tofu/
-├── main.tf                          # Recursos principales (S3 + módulos Lambda)
-├── iam.tf                           # Rol IAM y políticas para las Lambdas
-├── variables.tf                     # Definición de variables de entrada
-├── outputs.tf                       # Outputs del proyecto
-├── terraform.tfvars                 # Valores de variables (no versionado)
-├── .gitignore
-│
+banking-pipeline-tofu/
+├── .github/workflows/tofu.yml       # Flujo CI/CD automatizado
+├── main.tf                          # S3, Lambdas y llamadas a módulos
+├── step_function.tf                 # Definición ASL de la máquina de estados
+├── iam.tf                           # Políticas de IAM (sin modificar)
+├── variables.tf                     # Variables de entrada
 ├── lambdas/
-│   ├── validate_json/
-│   │   └── lambda_function.py       # Paso 1: Valida campos obligatorios
-│   ├── scan_content/
-│   │   └── lambda_function.py       # Paso 2: Escanea por firma EICAR
-│   └── route_file/
-│       └── lambda_function.py       # Paso 3: Enruta a clean/ o quarantine/
-│
-└── modules/
-    └── lambda_function/
-        ├── main.tf                  # Módulo reutilizable: empaqueta y despliega Lambda
-        ├── variables.tf
-        └── outputs.tf
+│   ├── validate_json/lambda_function.py
+│   ├── scan_content/lambda_function.py  # Reutilizado como L2 AssessRisk
+│   └── route_file/lambda_function.py
+├── tests/                           # Casos de prueba JSON
+│   ├── normal_transaction.json
+│   ├── high_amount_transaction.json
+│   └── foreign_transaction.json
+└── modules/lambda_function/         # Módulo reutilizable de Lambda
 ```
 
 ---
 
-## ☁️ Recursos AWS desplegados
+## ⚙️ CI/CD y Automatización
 
-| Recurso | Nombre | Descripción |
-|---|---|---|
-| `aws_s3_bucket` | `{project_name}-{student_id}` | Bucket principal de almacenamiento |
-| `aws_lambda_function` | `...-validate` | Valida el esquema del evento de entrada |
-| `aws_lambda_function` | `...-scan` | Detecta contenido malicioso (firma EICAR) |
-| `aws_lambda_function` | `...-route` | Mueve el archivo a la carpeta correcta en S3 |
-| `aws_iam_role` | `...-lambda-role` | Rol compartido por las tres Lambdas |
-| `aws_iam_policy` | `...-s3-access` | Permisos `GetObject`, `PutObject`, `DeleteObject` sobre el bucket |
+El despliegue de este proyecto está totalmente automatizado mediante **GitHub Actions** (`.github/workflows/tofu.yml`). 
+Se utiliza **OIDC (OpenID Connect)** para autenticar GitHub con AWS sin necesidad de almacenar credenciales a largo plazo.
 
----
-
-## ⚙️ Variables
-
-| Variable | Tipo | Default | Descripción |
-|---|---|---|---|
-| `project_name` | `string` | `"curso-tofu"` | Prefijo usado en el nombre de todos los recursos |
-| `student_id` | `string` | *(requerido)* | Identificador único del estudiante |
-| `aws_region` | `string` | `"us-east-1"` | Región de AWS donde se despliega la infraestructura |
+### Flujo de Trabajo (Workflow)
+1. **Linting & Formatting**: Se verifica el formato del código de OpenTofu (`tofu fmt`).
+2. **Plan**: Se genera un plan de ejecución detallado cuando hay Pull Requests hacia `main`.
+3. **Apply**: Cuando se hace un merge o commit directo a `main`, se ejecuta `tofu apply -auto-approve` para desplegar la infraestructura en la nube.
 
 ---
 
-## 📤 Outputs
-
-| Output | Descripción |
-|---|---|
-| `bucket_name` | Objeto completo del bucket S3 creado |
-| `bucket_arn` | ARN del bucket S3 |
-
----
-
-## 🔧 Lambdas — Lógica de negocio
-
-### 1. `validate_json`
-Verifica que el evento de entrada contenga todos los campos obligatorios:
-
-```
-file_id · filename · bucket · input_key · content_base64
-```
-
-Si falta alguno, lanza un `ValueError`. Si pasa, añade `validation_passed: true` al evento y lo retorna.
-
----
-
-### 2. `scan_content`
-Decodifica el campo `content_base64` y busca la firma **EICAR** (estándar para pruebas de antivirus):
-
-- ✅ Limpio → `is_malicious: false`, `scan_reason: "clean"`
-- 🚨 Detectado → `is_malicious: true`, `scan_reason: "EICAR signature detected"`
-
----
-
-### 3. `route_file`
-Lee el flag `is_malicious` del evento y copia el archivo dentro del bucket S3:
-
-- Limpio → `s3://<bucket>/clean/<file_id>.json`
-- Malicioso → `s3://<bucket>/quarantine/<file_id>.json`
-
-El archivo de origen se elimina después de la copia.
-
----
-
-## 🏗️ Módulo reutilizable: `lambda_function`
-
-El módulo `./modules/lambda_function` encapsula el patrón de despliegue de cualquier Lambda Python:
-
-1. Empaqueta automáticamente el directorio fuente en un `.zip` usando `archive_file`.
-2. Despliega la función con runtime `python3.12`.
-3. Calcula el hash del código para detectar cambios en re-despliegues.
-
-**Variables del módulo:**
-
-| Variable | Tipo | Default | Descripción |
-|---|---|---|---|
-| `function_name` | `string` | — | Nombre de la función Lambda |
-| `source_dir` | `string` | — | Ruta al directorio con el código Python |
-| `role_arn` | `string` | — | ARN del rol IAM a asignar |
-| `timeout` | `number` | `10` | Timeout en segundos |
-
----
-
-## 🚀 Uso
+## 🚀 Despliegue Local
 
 ### Prerrequisitos
+- OpenTofu `>= 1.6`
+- AWS CLI configurado
+- Credenciales con permisos suficientes
 
-- [OpenTofu](https://opentofu.org/docs/intro/install/) `>= 1.6`
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) configurado (`aws configure`)
-- Credenciales AWS con permisos sobre S3, Lambda e IAM
-
-### Configuración
-
-Crea un archivo `terraform.tfvars` (no se versiona):
-
-```hcl
-student_id = "tu-id-aqui"
-```
-
-### Comandos
+### Comandos de uso
 
 ```bash
-# 1. Inicializar providers y módulos
+# Inicializar OpenTofu
 tofu init
 
-# 2. Previsualizar los cambios
+# Configurar la variable student_id (crear terraform.tfvars)
+echo 'student_id = "12345"' > terraform.tfvars
+
+# Visualizar cambios
 tofu plan
 
-# 3. Desplegar la infraestructura
-tofu apply
-
-# 4. Destruir todos los recursos
-tofu destroy
+# Desplegar en AWS
+tofu apply -auto-approve
 ```
 
 ---
 
-## 🔒 Seguridad y buenas prácticas
+## 🔒 Casos de Prueba
 
-- `terraform.tfvars` está en `.gitignore` — los valores sensibles nunca se versionan.
-- El estado de Terraform (`*.tfstate`) tampoco se versiona — usar un backend remoto (S3 + DynamoDB) en producción.
-- El rol IAM sigue el principio de **mínimo privilegio**: solo acceso a los objetos del bucket propio del proyecto.
-
----
-
-## 📝 Licencia
-
-Proyecto académico — UAG Big Data.
+La carpeta `tests/` incluye ejemplos listos para invocar la Step Function:
+- **`normal_transaction.json`**: Monto $1500, MX. (Termina en `approved/`)
+- **`high_amount_transaction.json`**: Monto $25000, MX. (Termina en `review/`)
+- **`foreign_transaction.json`**: Monto $500, US. (Termina en `review/`)

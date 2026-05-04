@@ -1,0 +1,7 @@
+{
+  "transaction_id": "tx-highamount-202",
+  "account": "1234-5678",
+  "amount": 25000.00,
+  "country": "MX",
+  "merchant": "Agencia Automotriz"
+}

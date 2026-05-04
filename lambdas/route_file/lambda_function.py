@@ -1,23 +1,38 @@
 import json
 import boto3
+import os
 
 s3 = boto3.client("s3")
 
 def lambda_handler(event, context):
-    bucket = event["bucket"]
-    source_key = event["input_key"]
+    print(f"[ROUTE] Routing transaction: {event.get('transaction_id')}")
     
-    dest_prefix = "quarantine/" if event.get("is_malicious") else "clean/"
-    dest_key = f"{dest_prefix}{event['file_id']}.json"
+    # El bucket se espera como variable de entorno o como parte del evento original
+    # Usaremos una variable de entorno BUCKET_NAME que configuraremos en Terraform
+    # o si no está, un placeholder.
+    bucket = os.environ.get("BUCKET_NAME", event.get("bucket", "default-bucket"))
+    tx_id = event.get("transaction_id", "unknown_tx")
     
-    print(f"[ROUTE] s3://{bucket}/{source_key} -> s3://{bucket}/{dest_key}")
+    # Determinar prefijo destino basado en risk_level
+    is_high_risk = event.get("risk_level") == "high"
+    dest_prefix = "review/" if is_high_risk else "approved/"
+    dest_key = f"{dest_prefix}{tx_id}.json"
     
-    s3.copy_object(
+    print(f"[ROUTE] Guardando transaccion en s3://{bucket}/{dest_key}")
+    
+    # Como la instrucción dice "move to s3://bucket/...", 
+    # y en este escenario no recibimos un archivo, vamos a guardar el JSON completo
+    # en la carpeta destino como si fuera el archivo procesado.
+    s3.put_object(
         Bucket=bucket,
-        CopySource={"Bucket": bucket, "Key": source_key},
-        Key=dest_key
+        Key=dest_key,
+        Body=json.dumps(event),
+        ContentType="application/json"
     )
-    s3.delete_object(Bucket=bucket, Key=source_key)
+    
+    # Eliminamos la logica antigua de copy_object/delete_object porque el 
+    # archivo de entrada original no existe en S3 para este escenario.
+    # (El evento viene directamente en JSON)
     
     event["final_location"] = f"s3://{bucket}/{dest_key}"
     return event
