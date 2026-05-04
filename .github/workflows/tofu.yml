@@ -20,10 +20,10 @@ permissions:
 env:
   TOFU_VERSION: "1.8.5"
   AWS_REGION: "us-east-1"
-  # CAMBIA esto: pega el output gha_role_arn del bootstrap.
-  AWS_ROLE: "arn:aws:iam::882692629600:role/demo-cicd-tofu-gha"
+  # Reemplazar con el ARN del rol OIDC creado en AWS
+  AWS_ROLE: "arn:aws:iam::489909410108:role/demo-cicd-tofu-gha"
   # Agregamos la variable para que OpenTofu no la pida en la terminal y falle el CI/CD
-  TF_VAR_student_id: "tu_matricula_o_id_aqui"
+  TF_VAR_student_id: "7777777"
 
 jobs:
   tofu:
