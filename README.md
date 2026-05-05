@@ -53,13 +53,15 @@ banking-pipeline-tofu/
 
 ## ⚙️ CI/CD y Automatización
 
-El despliegue de este proyecto está totalmente automatizado mediante **GitHub Actions** (`.github/workflows/tofu.yml`). 
-Se utiliza **OIDC (OpenID Connect)** para autenticar GitHub con AWS sin necesidad de almacenar credenciales a largo plazo.
+Este proyecto utiliza **GitHub Actions** para que el despliegue sea 100% automático.
 
-### Flujo de Trabajo (Workflow)
-1. **Linting & Formatting**: Se verifica el formato del código de OpenTofu (`tofu fmt`).
-2. **Plan**: Se genera un plan de ejecución detallado cuando hay Pull Requests hacia `main`.
-3. **Apply**: Cuando se hace un merge o commit directo a `main`, se ejecuta `tofu apply -auto-approve` para desplegar la infraestructura en la nube.
+### ¿Cómo funciona?
+1. **Push**: Cada vez que subes un cambio a la rama `main` de este repositorio, GitHub detecta el movimiento.
+2. **Runner**: GitHub activa una computadora virtual que descarga el código y prepara el entorno de OpenTofu.
+3. **Autenticación**: Se conecta a AWS de forma segura usando **OIDC** (sin contraseñas guardadas).
+4. **Despliegue**: La computadora ejecuta `tofu init` y `tofu apply` automáticamente, actualizando tus Lambdas y la Step Function en segundos.
+
+Esto asegura que la infraestructura en la nube siempre coincida con la versión más reciente de tu código.
 
 ---
 
