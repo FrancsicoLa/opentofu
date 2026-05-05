@@ -1,7 +1,7 @@
 variable "project_name" {
   description = "Nombre del proyecto"
   type        = string
-  default     = "curso-tofu"
+  default     = "demo-cicd-tofu"
 }
 
 variable "student_id" {
