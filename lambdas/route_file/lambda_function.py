@@ -8,9 +8,9 @@ def lambda_handler(event, context):
     print(f"[ROUTE] Routing transaction: {event.get('transaction_id')}")
     
     # El bucket se espera como variable de entorno o como parte del evento original
-    # Usaremos una variable de entorno BUCKET_NAME que configuraremos en Terraform
-    # o si no está, un placeholder.
-    bucket = os.environ.get("BUCKET_NAME", event.get("bucket", "default-bucket"))
+    # Usaremos el nombre real del bucket de nuestro proyecto como default
+    # para que no falle la prueba.
+    bucket = os.environ.get("BUCKET_NAME", event.get("bucket", "demo-cicd-tofu-7777777"))
     tx_id = event.get("transaction_id", "unknown_tx")
     
     # Determinar prefijo destino basado en risk_level
