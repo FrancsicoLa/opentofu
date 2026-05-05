@@ -1,0 +1,7 @@
+{
+  "transaction_id": "tx-invalid-404",
+  "account": "invalid_format",
+  "amount": -50.00,
+  "country": "MEXICO",
+  "merchant": "Hacker"
+}

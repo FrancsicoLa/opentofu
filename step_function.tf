@@ -48,6 +48,12 @@ resource "aws_sfn_state_machine" "banking_pipeline" {
         Type     = "Task"
         Resource = module.lambda_validate.function_arn
         Next     = "AssessRisk"
+        Catch = [
+          {
+            ErrorEquals = ["States.ALL"]
+            Next        = "TransactionFailed"
+          }
+        ]
       }
       AssessRisk = {
         Type     = "Task"
@@ -68,12 +74,20 @@ resource "aws_sfn_state_machine" "banking_pipeline" {
       HighRiskRoute = {
         Type     = "Task"
         Resource = module.lambda_route.function_arn
-        End      = true
+        Next     = "TransactionSucceeded"
       }
       LowRiskRoute = {
         Type     = "Task"
         Resource = module.lambda_route.function_arn
-        End      = true
+        Next     = "TransactionSucceeded"
+      }
+      TransactionFailed = {
+        Type  = "Fail"
+        Error = "ValidationError"
+        Cause = "The transaction did not pass validation rules."
+      }
+      TransactionSucceeded = {
+        Type = "Succeed"
       }
     }
   })
