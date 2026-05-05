@@ -12,7 +12,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "quarantine" {
-  bucket = "${var.project_name}-${var.student_id}"
+  bucket        = "${var.project_name}-${var.student_id}"
   force_destroy = true
 }
 

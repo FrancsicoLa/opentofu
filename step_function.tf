@@ -55,12 +55,12 @@ resource "aws_sfn_state_machine" "banking_pipeline" {
         Next     = "RouteTransaction"
       }
       RouteTransaction = {
-        Type     = "Choice"
+        Type = "Choice"
         Choices = [
           {
-            Variable = "$.risk_level"
+            Variable     = "$.risk_level"
             StringEquals = "high"
-            Next = "HighRiskRoute"
+            Next         = "HighRiskRoute"
           }
         ]
         Default = "LowRiskRoute"
